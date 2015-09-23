@@ -22,7 +22,7 @@ func getPayload(t netest.PatternType) []byte {
 		 UDP header is 8 bytes */
 	if payload == nil {
 		length := MTU - 32
-		payload := make([]byte, length)
+		payload = make([]byte, 0)
 		for i := 0; i < length; i += len(netest.Patterns[t]) {
 			payload = append(payload, netest.Patterns[t]...)
 		}
