@@ -91,7 +91,11 @@ func (c *Connection) ReceiveMsg() (*Packet, error) {
 
 	p := new(Packet)
 	p.PacketHeader = *h
-	p.Payload = buf[4 : h.Length-1]
+	if h.Length-4 > 0 {
+		p.Payload = buf[4 : h.Length-1]
+	} else {
+		p.Payload = make([]byte, 0)
+	}
 	return p, c.err
 }
 
