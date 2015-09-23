@@ -57,10 +57,10 @@ func (c *Connection) SendMsg(payload []byte) error {
 		return c.err
 	}
 	h := new(PacketHeader)
-	h.Length = uint16(len(payload) + 4)
+	h.Length = uint16(len(payload) + binary.Size(h))
 	h.Sequence = c.sequence
 
-	buf := make([]byte, h.Length)
+	buf := make([]byte, 0)
 	buffer := bytes.NewBuffer(buf)
 
 	binary.Write(buffer, binary.BigEndian, h)
