@@ -57,6 +57,9 @@ func (c *Connection) SendMsg(payload []byte) error {
 	if c.err != nil {
 		return c.err
 	}
+	if len(payload) > MTU {
+		return fmt.Errorf("payload cannot be greater than %d bytes", MTU)
+	}
 	h := new(PacketHeader)
 	h.Length = uint16(len(payload) + binary.Size(h))
 	h.Sequence = c.sequence
@@ -68,7 +71,7 @@ func (c *Connection) SendMsg(payload []byte) error {
 	buffer.Write(payload)
 	_, c.err = buffer.WriteTo(c.socket)
 
-	if c.err != nil {
+	if c.err == nil {
 		c.sequence++
 	}
 	return c.err
