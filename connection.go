@@ -3,6 +3,7 @@ package netest
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"net"
 )
 
@@ -91,8 +92,12 @@ func (c *Connection) ReceiveMsg() (*Packet, error) {
 
 	p := new(Packet)
 	p.PacketHeader = *h
+	if int(h.Length) > MTU {
+		return p, fmt.Errorf("packet header indicates length of %d but it can be a maximum of %d", h.Length, MTU)
+	}
+
 	if h.Length-4 > 0 {
-		p.Payload = buf[4 : h.Length-1]
+		p.Payload = buf[4 : h.Length-uint16(binary.Size(h))-1]
 	} else {
 		p.Payload = make([]byte, 0)
 	}
