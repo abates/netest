@@ -13,13 +13,13 @@ func humanize(value uint64, duration time.Duration) string {
 	var megabyte = 1048576.0
 	var gigabyte = 1073741824.0
 
-	v := float64(value)
+	v := float64(value) / duration.Seconds()
 	if v >= gigabyte {
-		return fmt.Sprintf("%.1f GB/s", (v/gigabyte)*duration.Seconds())
+		return fmt.Sprintf("%.1f GB/s", (v / gigabyte))
 	} else if v >= megabyte {
-		return fmt.Sprintf("%.1f MB/s", (v/megabyte)*duration.Seconds())
+		return fmt.Sprintf("%.1f MB/s", (v / megabyte))
 	} else if v >= kilobyte {
-		return fmt.Sprintf("%.1f KB/s", (v/kilobyte)*duration.Seconds())
+		return fmt.Sprintf("%.1f KB/s", (v / kilobyte))
 	} else {
 		return fmt.Sprintf("%.1f B/s", v)
 	}
@@ -37,8 +37,8 @@ func main() {
 
 	pollInterval := time.Second
 
-	connection, err := netest.NewSink(os.Args[1])
-	defer connection.Close()
+	connection, err := netest.NewUdpSink(os.Args[1])
+	//defer connection.Close()
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create connection: %v\n", err)
@@ -55,6 +55,7 @@ func main() {
 		fmt.Printf("\n\n")
 		var lastSequence float64
 		var bytesRead uint64
+		var duration time.Duration
 		ticker := time.NewTicker(pollInterval)
 		for {
 			select {
@@ -69,11 +70,12 @@ func main() {
 				if packetsRead == 0 {
 					packetsRead = 1.0
 				}
-
-				fmt.Printf("\033[1A\033[1A")
-				fmt.Printf("     RX Rate: %s\n", humanize(bytesRead, pollInterval))
+				duration += pollInterval
+				fmt.Printf("\033[1A\033[1A\033[1A")
+				fmt.Printf("     RX Rate: %s\n", humanize(bytesRead, duration))
 				fmt.Printf("Success Rate: %.1f\n", (100.0 - (packetsDropped / packetsRead)))
-				bytesRead = 0
+				fmt.Printf("    Duration: %6v Bytes: %v\n", duration, bytesRead)
+				//bytesRead = 0
 			}
 		}
 	}()

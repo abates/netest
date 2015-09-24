@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"net"
 )
 
@@ -20,33 +19,11 @@ type Packet struct {
 	Payload []byte
 }
 
-type readWriter struct {
-	reader *io.PipeReader
-	writer *io.PipeWriter
-	buffer *bytes.Buffer
-}
-
-func (rw *readWriter) Read(p []byte) (int, error) {
-	return rw.reader.Read(p)
-}
-
-func (rw *readWriter) Write(p []byte) (int, error) {
-	return rw.buffer.Write(p)
-}
-
-func (rw *readWriter) Flush() (int64, error) {
-	return rw.buffer.WriteTo(rw.writer)
-}
-
-func (rw *readWriter) Close() error {
-	rw.reader.Close()
-	return rw.writer.Close()
-}
-
 type Connection struct {
 	err      error
-	socket   *readWriter
+	socket   net.Conn
 	sequence uint16
+	buffer   []byte
 }
 
 func (c *Connection) getUDPAddr(address string) *net.UDPAddr {
@@ -60,9 +37,7 @@ func (c *Connection) getUDPAddr(address string) *net.UDPAddr {
 
 func newConnection() *Connection {
 	c := new(Connection)
-	c.socket = new(readWriter)
-	c.socket.reader, c.socket.writer = io.Pipe()
-	c.socket.buffer = bytes.NewBuffer(make([]byte, 0))
+	c.buffer = make([]byte, MTU)
 	return c
 }
 
@@ -72,37 +47,19 @@ func NewUdpSrc(laddr, raddr string) (*Connection, error) {
 	localAddr := c.getUDPAddr(laddr)
 	remoteAddr := c.getUDPAddr(raddr)
 
-	var socket *net.UDPConn
 	if c.err == nil {
-		socket, c.err = net.DialUDP("udp", localAddr, remoteAddr)
+		c.socket, c.err = net.DialUDP("udp", localAddr, remoteAddr)
 	}
 
-	if c.err == nil {
-		go func() {
-			_, err := io.Copy(socket, c.socket)
-			if err != nil {
-				panic(fmt.Sprintf("Failed to copy to the network: %v", err))
-			}
-			socket.Close()
-		}()
-	}
 	return c, c.err
 }
 
 func NewUdpSink(laddr string) (*Connection, error) {
-	c := new(Connection)
+	c := newConnection()
 	localAddr := c.getUDPAddr(laddr)
 
 	if c.err == nil {
-		var socket *net.UDPConn
-		socket, c.err = net.ListenUDP("udp", localAddr)
-		if c.err == nil {
-			go func() {
-				buffer := make([]byte, MTU)
-				io.CopyBuffer(socket, c.socket, buffer)
-				socket.Close()
-			}()
-		}
+		c.socket, c.err = net.ListenUDP("udp", localAddr)
 	}
 	return c, c.err
 }
@@ -119,11 +76,14 @@ func (c *Connection) SendMsg(payload []byte) error {
 	h := new(PacketHeader)
 	h.Length = uint16(len(payload) + binary.Size(h))
 	h.Sequence = c.sequence
+	buffer := bytes.NewBuffer(make([]byte, 0))
 
-	binary.Write(c.socket, binary.BigEndian, h)
-	_, c.err = c.socket.Write(payload)
+	c.err = binary.Write(buffer, binary.BigEndian, h)
 	if c.err == nil {
-		_, c.err = c.socket.Flush()
+		_, c.err = buffer.Write(payload)
+		if c.err == nil {
+			_, c.err = buffer.WriteTo(c.socket)
+		}
 	}
 
 	if c.err == nil {
@@ -136,18 +96,25 @@ func (c *Connection) ReceiveMsg() (*Packet, error) {
 	if c.err != nil {
 		return nil, c.err
 	}
-
-	h := new(PacketHeader)
-	binary.Read(c.socket, binary.BigEndian, h)
-
 	p := new(Packet)
-	p.PacketHeader = *h
 
-	if h.Length-4 > 0 {
-		p.Payload = make([]byte, h.Length)
-		_, c.err = c.socket.Read(p.Payload)
-	} else {
-		p.Payload = make([]byte, 0)
+	//b := make([]byte, MTU)
+	length, err := c.socket.Read(c.buffer)
+	if err == nil {
+		buffer := bytes.NewBuffer(c.buffer[0:length])
+		h := new(PacketHeader)
+		binary.Read(buffer, binary.BigEndian, h)
+		p.PacketHeader = *h
+
+		if int(h.Length) > length {
+			return p, fmt.Errorf("Packet Header reports length %d which is larger than the buffer size of %d", h.Length, len(c.buffer))
+		}
+
+		if h.Length-4 > 0 {
+			p.Payload = c.buffer[4:h.Length]
+		} else {
+			p.Payload = make([]byte, 0)
+		}
 	}
 	return p, c.err
 }
