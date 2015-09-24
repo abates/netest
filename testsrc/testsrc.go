@@ -13,7 +13,7 @@ var argParser *flags.Parser
 var payload []byte
 
 var options struct {
-	BindAddress string `short:"a" long:"address" description:"Address to bind socket to" default:"0.0.0.0:0"`
+	BindAddress string `short:"a" long:"address" description:"Address to send traffic to" default:"0.0.0.0:0"`
 }
 
 func getPayload(t netest.PatternType) []byte {
@@ -50,7 +50,7 @@ func main() {
 		options.BindAddress = options.BindAddress + ":0"
 	}
 
-	connection, err := netest.NewSrc(options.BindAddress, args[0])
+	connection, err := netest.NewUdpSrc(options.BindAddress, args[0])
 	defer connection.Close()
 
 	if err != nil {
