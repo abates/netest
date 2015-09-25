@@ -6,14 +6,25 @@ import (
 	"github.com/jessevdk/go-flags"
 	"os"
 	"strings"
+	"time"
 )
 
 var MTU = 1500
 var argParser *flags.Parser
 var payload []byte
 
+type Duration struct {
+	time.Duration
+}
+
+func (d *Duration) UnmarshalFlag(s string) (err error) {
+	d.Duration, err = time.ParseDuration(s)
+	return err
+}
+
 var options struct {
-	BindAddress string `short:"a" long:"address" description:"Address to send traffic to" default:"0.0.0.0:0"`
+	BindAddress  string   `short:"a" long:"address" description:"Address to send traffic to" default:"0.0.0.0:0"`
+	PollInterval Duration `short:"p" long:"poll" description:"Poll interval to display stats" default:"1s"`
 }
 
 func getPayload(t netest.PatternType) []byte {
@@ -58,11 +69,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	ticker := time.NewTicker(options.PollInterval.Duration)
+	var duration time.Duration
+	var bytesSent int64
+	fmt.Printf("\n\n")
 	for {
-		err := connection.SendMsg(getPayload(netest.AllOnesPattern))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to send message: %v\n", err)
-			os.Exit(1)
+		select {
+		case <-ticker.C:
+			duration += options.PollInterval.Duration
+			fmt.Printf("\033[1A\033[1A")
+			fmt.Printf("     TX Rate: %s\n", netest.Humanize(float64(bytesSent)/duration.Seconds()))
+			fmt.Printf("    Duration: %6v Sent: %v\n", duration, netest.Humanize(float64(bytesSent)))
+		default:
+			length, err := connection.SendMsg(getPayload(netest.AllOnesPattern))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to send message: %v\n", err)
+				os.Exit(1)
+			}
+			bytesSent += length
 		}
 	}
 }
