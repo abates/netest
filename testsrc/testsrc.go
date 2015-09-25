@@ -78,8 +78,8 @@ func main() {
 		case <-ticker.C:
 			duration += options.PollInterval.Duration
 			fmt.Printf("\033[1A\033[1A")
-			fmt.Printf("     TX Rate: %s\n", netest.Humanize(float64(bytesSent)/duration.Seconds()))
-			fmt.Printf("    Duration: %6v Sent: %v\n", duration, netest.Humanize(float64(bytesSent)))
+			fmt.Printf("     TX Rate: %s/s          \n", netest.Humanize(float64(bytesSent)/duration.Seconds()))
+			fmt.Printf("    Duration: %-6v Sent: %v          \n", duration, netest.Humanize(float64(bytesSent)))
 		default:
 			length, err := connection.SendMsg(getPayload(netest.AllOnesPattern))
 			if err != nil {
