@@ -8,23 +8,6 @@ import (
 	"time"
 )
 
-func humanize(value uint64, duration time.Duration) string {
-	var kilobyte = 1024.0
-	var megabyte = 1048576.0
-	var gigabyte = 1073741824.0
-
-	v := float64(value) / duration.Seconds()
-	if v >= gigabyte {
-		return fmt.Sprintf("%.1f GB/s", (v / gigabyte))
-	} else if v >= megabyte {
-		return fmt.Sprintf("%.1f MB/s", (v / megabyte))
-	} else if v >= kilobyte {
-		return fmt.Sprintf("%.1f KB/s", (v / kilobyte))
-	} else {
-		return fmt.Sprintf("%.1f B/s", v)
-	}
-}
-
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage: %s <address:port>\n", path.Base(os.Args[0]))
 }
@@ -72,9 +55,9 @@ func main() {
 				}
 				duration += pollInterval
 				fmt.Printf("\033[1A\033[1A\033[1A")
-				fmt.Printf("     RX Rate: %s\n", humanize(bytesRead, duration))
+				fmt.Printf("     RX Rate: %s/s\n", netest.Humanize(float64(bytesRead)/duration))
 				fmt.Printf("Success Rate: %.1f\n", (100.0 - (packetsDropped / packetsRead)))
-				fmt.Printf("    Duration: %6v Bytes: %v\n", duration, bytesRead)
+				fmt.Printf("    Duration: %6v Sent: %v\n", duration, netest.Humanize(float64(bytesRead)))
 				//bytesRead = 0
 			}
 		}
