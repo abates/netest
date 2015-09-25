@@ -35,7 +35,7 @@ func main() {
 	sequence := make(chan uint16)
 
 	go func() {
-		fmt.Printf("\n\n")
+		fmt.Printf("\n\n\n")
 		var lastSequence float64
 		var bytesRead uint64
 		var duration time.Duration
@@ -55,9 +55,9 @@ func main() {
 				}
 				duration += pollInterval
 				fmt.Printf("\033[1A\033[1A\033[1A")
-				fmt.Printf("     RX Rate: %s/s\n", netest.Humanize(float64(bytesRead)/duration))
-				fmt.Printf("Success Rate: %.1f\n", (100.0 - (packetsDropped / packetsRead)))
-				fmt.Printf("    Duration: %6v Sent: %v\n", duration, netest.Humanize(float64(bytesRead)))
+				fmt.Printf("     RX Rate: %v/s      \n", netest.Humanize(float64(bytesRead)/duration.Seconds()))
+				fmt.Printf("Success Rate: %-.1f\n", (100.0 - (packetsDropped / packetsRead)))
+				fmt.Printf("    Duration: %-6v Received: %-10v\n", duration, netest.Humanize(float64(bytesRead)))
 				//bytesRead = 0
 			}
 		}
