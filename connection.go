@@ -64,13 +64,14 @@ func NewUdpSink(laddr string) (*Connection, error) {
 	return c, c.err
 }
 
-func (c *Connection) SendMsg(payload []byte) error {
+func (c *Connection) SendMsg(payload []byte) (int64, error) {
+	var length int64
 	if c.err != nil {
-		return c.err
+		return 0, c.err
 	}
 
 	if len(payload) > MTU {
-		return fmt.Errorf("payload cannot be greater than %d bytes", MTU)
+		return 0, fmt.Errorf("payload cannot be greater than %d bytes", MTU)
 	}
 
 	h := new(PacketHeader)
@@ -82,14 +83,14 @@ func (c *Connection) SendMsg(payload []byte) error {
 	if c.err == nil {
 		_, c.err = buffer.Write(payload)
 		if c.err == nil {
-			_, c.err = buffer.WriteTo(c.socket)
+			length, c.err = buffer.WriteTo(c.socket)
 		}
 	}
 
 	if c.err == nil {
 		c.sequence++
 	}
-	return c.err
+	return length, c.err
 }
 
 func (c *Connection) ReceiveMsg() (*Packet, error) {
