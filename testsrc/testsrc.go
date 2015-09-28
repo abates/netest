@@ -25,6 +25,7 @@ func (d *Duration) UnmarshalFlag(s string) (err error) {
 var options struct {
 	BindAddress  string   `short:"a" long:"address" description:"Address to send traffic to" default:"0.0.0.0:0"`
 	PollInterval Duration `short:"p" long:"poll" description:"Poll interval to display stats" default:"1s"`
+	UseTCP       bool     `short:"t" description:"Use TCP instead of UDP" default:"false"`
 }
 
 func getPayload(t netest.PatternType) []byte {
@@ -61,7 +62,12 @@ func main() {
 		options.BindAddress = options.BindAddress + ":0"
 	}
 
-	connection, err := netest.NewUdpSrc(options.BindAddress, args[0])
+	var connection *netest.Source
+	if options.UseTCP {
+		connection, err = netest.NewTCPSource(options.BindAddress, args[0])
+	} else {
+		connection, err = netest.NewUDPSource(options.BindAddress, args[0])
+	}
 	defer connection.Close()
 
 	if err != nil {
@@ -71,7 +77,7 @@ func main() {
 
 	ticker := time.NewTicker(options.PollInterval.Duration)
 	var duration time.Duration
-	var bytesSent int64
+	var bytesSent int
 	fmt.Printf("\n\n")
 	for {
 		select {

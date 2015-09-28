@@ -2,6 +2,10 @@ package netest
 
 import (
 	"fmt"
+	"github.com/alexcesaro/log"
+	"github.com/alexcesaro/log/golog"
+	"net"
+	"os"
 )
 
 const (
@@ -10,6 +14,27 @@ const (
 	Gigabyte = 1073741824.0
 )
 
+type Connection struct {
+	err error
+}
+
+func (c *Connection) getUDPAddr(address string) *net.UDPAddr {
+	var udpAddress *net.UDPAddr
+	if c.err == nil {
+		udpAddress, c.err = net.ResolveUDPAddr("udp", address)
+		return udpAddress
+	}
+	return nil
+}
+
+func (c *Connection) getTCPAddr(address string) *net.TCPAddr {
+	var tcpAddress *net.TCPAddr
+	if c.err == nil {
+		tcpAddress, c.err = net.ResolveTCPAddr("tcp", address)
+		return tcpAddress
+	}
+	return nil
+}
 func Humanize(v float64) string {
 	if v >= Gigabyte {
 		return fmt.Sprintf("%.1f GB", (v / Gigabyte))
@@ -20,4 +45,10 @@ func Humanize(v float64) string {
 	} else {
 		return fmt.Sprintf("%.1f B", v)
 	}
+}
+
+var logger log.Logger
+
+func init() {
+	logger = golog.New(os.Stderr, log.Info)
 }

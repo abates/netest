@@ -3,28 +3,54 @@ package main
 import (
 	"fmt"
 	"github.com/abates/netest"
+	"github.com/jessevdk/go-flags"
 	"os"
-	"path"
 	"time"
 )
 
-func printUsage() {
-	fmt.Fprintf(os.Stderr, "Usage: %s <address:port>\n", path.Base(os.Args[0]))
+var argParser *flags.Parser
+
+type Duration struct {
+	time.Duration
+}
+
+func (d *Duration) UnmarshalFlag(s string) (err error) {
+	d.Duration, err = time.ParseDuration(s)
+	return err
+}
+
+var options struct {
+	PollInterval Duration `short:"p" long:"poll" description:"Poll interval to display stats" default:"1s"`
+	UseTCP       bool     `short:"t" description:"Use TCP instead of UDP" default:"false"`
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
+	argParser = flags.NewParser(&options, flags.Default)
+	argParser.Usage = "[OPTIONS] <address:port>"
+	args, err := argParser.Parse()
+
+	if err != nil {
+		argParser.WriteHelp(os.Stderr)
 		os.Exit(1)
 	}
 
-	pollInterval := time.Second
+	if len(args) < 1 {
+		fmt.Fprintf(os.Stderr, "Address not specified\n")
+		argParser.WriteHelp(os.Stderr)
+		os.Exit(1)
+	}
 
-	connection, err := netest.NewUdpSink(os.Args[1])
-	//defer connection.Close()
+	var connection *netest.Sink
+	if options.UseTCP {
+		connection, err = netest.NewTCPSink(args[0])
+	} else {
+		connection, err = netest.NewUDPSink(args[0])
+	}
+	defer connection.Close()
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create connection: %v\n", err)
+		argParser.WriteHelp(os.Stderr)
 		os.Exit(1)
 	}
 
@@ -39,7 +65,7 @@ func main() {
 		var lastSequence float64
 		var bytesRead uint64
 		var duration time.Duration
-		ticker := time.NewTicker(pollInterval)
+		ticker := time.NewTicker(options.PollInterval.Duration)
 		for {
 			select {
 			case length := <-count:
@@ -53,18 +79,17 @@ func main() {
 				if packetsRead == 0 {
 					packetsRead = 1.0
 				}
-				duration += pollInterval
+				duration += options.PollInterval.Duration
 				fmt.Printf("\033[1A\033[1A\033[1A")
 				fmt.Printf("     RX Rate: %v/s      \n", netest.Humanize(float64(bytesRead)/duration.Seconds()))
 				fmt.Printf("Success Rate: %-.1f\n", (100.0 - (packetsDropped / packetsRead)))
 				fmt.Printf("    Duration: %-6v Received: %-10v\n", duration, netest.Humanize(float64(bytesRead)))
-				//bytesRead = 0
 			}
 		}
 	}()
 
 	for {
-		packet, err := connection.ReceiveMsg()
+		packet := connection.ReceiveMsg()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed reading from connection %v\n", err)
 			os.Exit(1)
